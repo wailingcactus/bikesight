@@ -3,21 +3,25 @@ import requests
 import pandas as pd
 import streamlit as st
 
+from data_loader import load_trips_from_db
+
 st.set_page_config(page_title="Lyft Bike App", page_icon="🚲", layout="wide")
 st.title("🚲 Lyft Bike App — Starter")
 
 st.markdown('''
 This starter shows two things:
-1) Load and analyze a local CSV of historical trips.
+1) Load and analyze historical trips from S3 (cached in SQLite).
 2) (Optional) Pull live station status from a GBFS feed if you provide an index URL in `secrets`.
 ''')
 
 @st.cache_data
-def load_csv(path: str):
+def load_trips():
+    db_path = os.path.join("data", "trips.sqlite")
+    s3_url = "https://s3.amazonaws.com/baywheels-data/index.html"
     try:
-        return pd.read_csv(path, low_memory=False)
+        return load_trips_from_db(db_path, s3_url)
     except Exception as e:
-        st.info(f"Could not load CSV at `{path}`. Error: {e}")
+        st.info(f"Could not load trips data. Error: {e}")
         return None
 
 @st.cache_data(ttl=30)
@@ -38,10 +42,9 @@ def find_feed_url(gbfs_index: dict, feed_name: str):
         pass
     return None
 
-# ---------- Historical CSV section ----------
-st.header("Part 1 — Historical trips (CSV)")
-csv_path = os.path.join("data", "baywheels-tripdata.csv")
-df = load_csv(csv_path)
+# ---------- Historical data section ----------
+st.header("Part 1 — Historical trips")
+df = load_trips()
 
 if df is not None:
     st.write("Preview:", df.head())
@@ -62,7 +65,7 @@ if df is not None:
     else:
         st.warning("Couldn't find station columns.")
 else:
-    st.info("Add a CSV to `./data/baywheels-tripdata.csv`.")
+    st.info("No trips data available.")
 
 # ---------- Live GBFS section ----------
 st.header("Part 2 — Live GBFS (optional)")
